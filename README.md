@@ -35,7 +35,7 @@ cargo install --path .
 
 ## Compiling
 
-Compiled using Cargo (1.68).
+Compilation tested using Cargo (1.68).
 
 ## Credits
 

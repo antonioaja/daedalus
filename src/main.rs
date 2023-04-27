@@ -67,11 +67,10 @@ fn main() -> Result<()> {
         }
 
         // Write out decrypted file
-        let mut dec_file =
-            File::create(&args.file.replace(extension(&args.file), "")).context(format!(
-                "Could not create {}",
-                &args.file.replace(extension(&args.file), "")
-            ))?;
+        let mut dec_file = File::create(&args.file.replace(".daedalus", "")).context(format!(
+            "Could not create {}",
+            &args.file.replace(".daedalus", "")
+        ))?;
         dec_file.write_all(&decrypted).context(format!(
             "Could not write to {}",
             "dec_".to_owned() + &args.file.clone()
@@ -81,12 +80,4 @@ fn main() -> Result<()> {
     }
 
     Ok(())
-}
-
-pub fn extension(filename: &str) -> &str {
-    filename
-        .rfind('.')
-        .map(|idx| &filename[idx..])
-        .filter(|ext| ext.chars().skip(1).all(|c| c.is_ascii_alphanumeric()))
-        .unwrap_or("")
 }

@@ -14,6 +14,25 @@ daedalus -f secret.txt -p password -e
 
 The encrypted file will be saved in the current working directory.
 
+## Installing
+First clone the repo:
+
+```bash
+git clone https://github.com/antonioaja/daedalus.git
+```
+
+Then change into the directory:
+
+```bash
+cd daedalus
+```
+
+Finally, install using cargo:
+
+```bash
+cargo install --path .
+```
+
 ## Compiling
 
 Compiled using Cargo (1.68).

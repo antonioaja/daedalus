@@ -1,5 +1,5 @@
 # daedalus
-daedalus is CLI program which can encrypt/decrypt an input file with a given password. The encryption is done using AES256, with the key being a blake3 hash of the password. A random 32-byte IV is chosen as well.
+daedalus is CLI program which can encrypt/decrypt an input file with a given password. The encryption is done using AES256, with the key being a argon2 hash of the password. A random 32-byte IV is chosen as well.
 
 The output file is a .daedalus file.
 
@@ -43,4 +43,4 @@ Compilation tested using Cargo (1.68).
 * [anyhow](https://github.com/dtolnay/anyhow)
 * [clap](https://github.com/clap-rs/clap)
 * [rand](https://github.com/rust-random/rand)
-* [blake3](https://github.com/BLAKE3-team/BLAKE3)
+* [argon2](https://github.com/RustCrypto/password-hashes/tree/master/argon2)

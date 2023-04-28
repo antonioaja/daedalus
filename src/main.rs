@@ -1,4 +1,5 @@
 use anyhow::*;
+use argon2::Argon2;
 use clap::Parser;
 use libaes::Cipher;
 use std::fs::File;
@@ -33,7 +34,15 @@ fn main() -> Result<()> {
     let args: Args = Args::parse();
 
     // Create cipher
-    let cipher = Cipher::new_256(blake3::hash(args.password.as_bytes()).as_bytes());
+    let mut output_key = [0u8; 32];
+    Argon2::default()
+        .hash_password_into(
+            args.password.as_bytes(),
+            fibonacci_salter(args.password.len()).as_bytes(),
+            &mut output_key,
+        )
+        .expect("Could not hash password");
+    let cipher = Cipher::new_256(&output_key);
 
     // Read input file into memory
     let mut file = File::open(&args.file).context(format!("Could not open {}", &args.file))?;
@@ -80,4 +89,33 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+pub fn fibonacci_salter(pwd_len: usize) -> String {
+    let mut out_salt = String::new();
+
+    if pwd_len == 0 {
+        out_salt.insert(0, '0');
+    } else if pwd_len == 1 {
+        out_salt.insert(0, '1');
+    } else {
+        let mut last: u64 = 0;
+        let mut curr: u64 = 1;
+
+        out_salt.insert(0, '1');
+
+        for _ in 1..pwd_len {
+            let sum: u64 = last + curr;
+            last = curr;
+            curr = sum;
+
+            out_salt = out_salt + &curr.to_string();
+        }
+    }
+
+    while out_salt.len() < 8 {
+        out_salt = out_salt + "0";
+    }
+
+    return out_salt;
 }

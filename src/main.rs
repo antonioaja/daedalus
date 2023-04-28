@@ -51,13 +51,15 @@ fn main() -> Result<()> {
         .context(format!("Could not read {}", &args.file))?;
 
     if args.encrypt && !args.decrypt {
-        // Prepend file with random 32 bytes
-        for _ in 0..31 {
-            contents.insert(0, rand::random::<u8>());
+        // Prepend file with IV data (random 16 bytes)
+        let iv = rand::random::<[u8; 16]>();
+
+        for i in 0..16 {
+            contents.insert(i, iv[i]);
         }
 
         // Encrypt the input file
-        let encrypted = cipher.cbc_encrypt(&rand::random::<u128>().to_be_bytes(), &contents);
+        let encrypted = cipher.cbc_encrypt(&iv, &contents);
         let mut enc_file = File::create(args.file.clone() + ".daedalus").context(format!(
             "Could not create {}",
             args.file.clone() + ".daedalus"
@@ -68,10 +70,10 @@ fn main() -> Result<()> {
         ))?;
     } else if args.decrypt && !args.encrypt {
         // Decrypt the input file
-        let mut decrypted = cipher.cbc_decrypt(&rand::random::<u128>().to_be_bytes(), &contents);
+        let mut decrypted = cipher.cbc_decrypt(&contents[0..16], &contents);
 
-        // Remove garbage data
-        for _ in 0..31 {
+        // Remove IV data
+        for _ in 0..16 {
             decrypted.remove(0);
         }
 

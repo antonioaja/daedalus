@@ -4,15 +4,21 @@ daedalus is CLI program which can encrypt/decrypt an input file with a given pas
 The output file is a .daedalus file. This includes a 32-byte header, 32-byte blake3 hash of the input, and the 16-byte IV.
 
 ## How to Use
-daedalus requires two things: input file & password
+daedalus requires two things: input file & password.
+Password will be requested without showing plaintext.
 
 For example:
 
 ```bash
-daedalus -f secret.txt -p password
+daedalus secret.txt
 ```
 
-The encrypted file will be saved in the current working directory.
+```bash
+Password: <TYPE HERE>
+```
+
+The encrypted/decrypted file will be saved in the current working directory.
+Encrypted files will be have .daedalus extension.
 
 ## Installing
 First clone the repo:

@@ -27,6 +27,7 @@ struct Args {
 }
 
 const HEADER_AES256_ARGON_FIB: &[u8; 32] = b"DAEDALUSAES256ARGON2FIBONAglowie";
+const HEADER_AES256_ARGON_BLAKE3: &[u8; 32] = b"DAEDALUSAES256ARGON2BLAKE3glowie";
 
 fn main() -> Result<()> {
     // Start timer
@@ -34,17 +35,6 @@ fn main() -> Result<()> {
 
     // Gather input arguments
     let args: Args = Args::parse();
-
-    // Create cipher
-    let mut output_key = [0u8; 32];
-    Argon2::default()
-        .hash_password_into(
-            args.password.as_bytes(),
-            fibonacci_salter(args.password.len()).as_bytes(),
-            &mut output_key,
-        )
-        .expect("Could not hash password");
-    let cipher = Cipher::new_256(&output_key);
 
     // Read input file into memory
     let mut file = File::open(&args.file).context(format!("Could not open {}", &args.file))?;
@@ -74,6 +64,14 @@ fn main() -> Result<()> {
         }
         let hash: [u8; 32] = *hasher.finalize().as_bytes();
 
+        // Create cipher
+        let mut output_key = [0u8; 32];
+        let salt = hash;
+        Argon2::default()
+            .hash_password_into(args.password.as_bytes(), &salt, &mut output_key)
+            .expect("Could not hash password");
+        let cipher = Cipher::new_256(&output_key);
+
         // Calculate random IV
         let iv = rand::random::<[u8; 16]>();
 
@@ -84,7 +82,7 @@ fn main() -> Result<()> {
 
         // Insert header, file hash, & IV
         enc_file
-            .write_all(HEADER_AES256_ARGON_FIB)
+            .write_all(HEADER_AES256_ARGON_BLAKE3)
             .context("Could not write header to encrypted output!")?;
         enc_file
             .write_all(&hash)
@@ -135,6 +133,19 @@ fn main() -> Result<()> {
             .context("Could not read hash from encrypted input!")?;
         file.read_exact(&mut iv)
             .context("Could not read IV from encrypted input!")?;
+        let salt_method: [u8; 6] = header[20..26].try_into().unwrap();
+
+        // Create cipher
+        let mut output_key = [0u8; 32];
+        let salt = match &salt_method {
+            b"FIBONA" => fibonacci_salter(args.password.len()).as_bytes().to_vec(),
+            b"BLAKE3" => input_hash.to_vec(),
+            _ => bail!("Invalid salting method!"),
+        };
+        Argon2::default()
+            .hash_password_into(args.password.as_bytes(), &salt, &mut output_key)
+            .expect("Could not hash password");
+        let cipher = Cipher::new_256(&output_key);
 
         // Create the output file
         let output_file_name = &args.file.replace(".daedalus", "");

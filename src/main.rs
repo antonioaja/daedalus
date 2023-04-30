@@ -12,18 +12,18 @@ use std::time::*;
     version,
     about = "A CLI program to encrypt/decrypt files"
 )]
-struct Args {
+struct Cli {
     /// The file to encrypt/decrypt
-    #[clap(short, long, value_parser)]
     file: String,
 
-    /// Password to encrypt/decrypt with
-    #[clap(short, long, value_parser)]
-    password: String,
-
     /// Activates verbose output
-    #[clap(short, long, value_parser, default_value_t = false)]
+    #[arg(short, long, value_parser, default_value_t = false)]
     verbose: bool,
+
+    /// Chooses salting method (only needs to be chosen for encryption)
+    /// [OPTIONS = blake3, fib]
+    #[arg(short, long, value_parser, default_value = "blake3")]
+    salt: String,
 }
 
 const HEADER_AES256_ARGON_FIB: &[u8; 32] = b"DAEDALUSAES256ARGON2FIBONAglowie";
@@ -34,7 +34,13 @@ fn main() -> Result<()> {
     let now: Instant = Instant::now();
 
     // Gather input arguments
-    let args: Args = Args::parse();
+    let args = Cli::parse();
+    if args.salt != "blake3" || args.salt != "fib" {
+        println!("Invalid salting method!");
+        return Ok(());
+    }
+    let password =
+        rpassword::prompt_password("Password: ").context("Unable to get password from user!")?;
 
     // Read input file into memory
     let mut file = File::open(&args.file).context(format!("Could not open {}", &args.file))?;
@@ -66,9 +72,20 @@ fn main() -> Result<()> {
 
         // Create cipher
         let mut output_key = [0u8; 32];
-        let salt = hash;
+        let header: [u8; 32];
+        let salt = match args.salt.as_str() {
+            "blake3" => {
+                header = *HEADER_AES256_ARGON_BLAKE3;
+                hash.to_vec()
+            }
+            "fib" => {
+                header = *HEADER_AES256_ARGON_FIB;
+                fibonacci_salter(password.len()).as_bytes().to_vec()
+            }
+            _ => bail!("Invalid salting method!"),
+        };
         Argon2::default()
-            .hash_password_into(args.password.as_bytes(), &salt, &mut output_key)
+            .hash_password_into(password.as_bytes(), &salt, &mut output_key)
             .expect("Could not hash password");
         let cipher = Cipher::new_256(&output_key);
 
@@ -82,7 +99,7 @@ fn main() -> Result<()> {
 
         // Insert header, file hash, & IV
         enc_file
-            .write_all(HEADER_AES256_ARGON_BLAKE3)
+            .write_all(&header)
             .context("Could not write header to encrypted output!")?;
         enc_file
             .write_all(&hash)
@@ -138,12 +155,12 @@ fn main() -> Result<()> {
         // Create cipher
         let mut output_key = [0u8; 32];
         let salt = match &salt_method {
-            b"FIBONA" => fibonacci_salter(args.password.len()).as_bytes().to_vec(),
+            b"FIBONA" => fibonacci_salter(password.len()).as_bytes().to_vec(),
             b"BLAKE3" => input_hash.to_vec(),
             _ => bail!("Invalid salting method!"),
         };
         Argon2::default()
-            .hash_password_into(args.password.as_bytes(), &salt, &mut output_key)
+            .hash_password_into(password.as_bytes(), &salt, &mut output_key)
             .expect("Could not hash password");
         let cipher = Cipher::new_256(&output_key);
 

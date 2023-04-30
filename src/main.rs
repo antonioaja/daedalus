@@ -72,7 +72,7 @@ fn main() -> Result<()> {
                 .context("Could not fill buffer for file hashing before encryption!")?;
             hasher.update(&leftovers);
         }
-        let hash: [u8; 32] = hasher.finalize().as_bytes().clone();
+        let hash: [u8; 32] = *hasher.finalize().as_bytes();
 
         // Calculate random IV
         let iv = rand::random::<[u8; 16]>();
@@ -213,10 +213,10 @@ pub fn fibonacci_salter(pwd_len: usize) -> String {
     }
 
     while out_salt.len() < 8 {
-        out_salt = out_salt + "0";
+        out_salt += "0";
     }
 
-    return out_salt;
+    out_salt
 }
 
 pub fn extension(filename: &str) -> &str {

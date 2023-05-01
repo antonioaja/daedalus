@@ -6,7 +6,7 @@ use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use libaes::Cipher;
 use std::fs::File;
 use std::io::prelude::*;
-use std::time::*;
+use std::{time::*, vec};
 
 #[derive(Parser, Debug)]
 #[clap(
@@ -48,7 +48,7 @@ fn main() -> Result<()> {
 
     if extension(&args.file) != ".daedalus" {
         // Calculate read/write operations
-        let mut buffer: [u8; 1000000] = [0; 1000000];
+        let mut buffer: Box<[u8]> = vec![0; 1000000].into_boxed_slice();
         let mut leftovers: Vec<u8> = vec![];
         let file_bytes = file
             .metadata()
@@ -121,7 +121,7 @@ fn main() -> Result<()> {
         pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})").unwrap().with_key("eta", |state: &ProgressState, w: &mut dyn std::fmt::Write| write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()).progress_chars("#>-"));
         file.rewind()
             .context(format!("Could not return to start of {}!", &args.file))?;
-        let mut buffer: [u8; 1000000] = [0; 1000000];
+        let mut buffer: Box<[u8]> = vec![0; 1000000].into_boxed_slice();
         let mut leftovers: Vec<u8> = vec![];
         for i in 0..full_chunks {
             file.read_exact(&mut buffer)
@@ -144,7 +144,7 @@ fn main() -> Result<()> {
         pb.finish_and_clear();
     } else if extension(&args.file) == ".daedalus" {
         // Calculate read/write operations
-        let mut buffer: [u8; 1000016] = [0; 1000016];
+        let mut buffer: Box<[u8]> = vec![0; 1000016].into_boxed_slice();
         let mut leftovers: Vec<u8> = vec![];
         let file_bytes = file
             .metadata()
@@ -215,7 +215,7 @@ fn main() -> Result<()> {
         let pb = ProgressBar::new(file_bytes);
         pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})").unwrap().with_key("eta", |state: &ProgressState, w: &mut dyn std::fmt::Write| write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()).progress_chars("#>-"));
         let mut dec_file = File::open(output_file_name).unwrap();
-        let mut buffer: [u8; 1000016] = [0; 1000016];
+        let mut buffer: Box<[u8]> = vec![0; 1000016].into_boxed_slice();
         let mut leftovers: Vec<u8> = vec![];
         let mut hasher = blake3::Hasher::new();
         for i in 0..full_chunks {

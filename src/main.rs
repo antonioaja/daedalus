@@ -1,6 +1,8 @@
 use anyhow::*;
 use argon2::Argon2;
 use clap::Parser;
+use console::{style, Emoji};
+use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use libaes::Cipher;
 use std::fs::File;
 use std::io::prelude::*;
@@ -16,10 +18,6 @@ struct Cli {
     /// The file to encrypt/decrypt
     file: String,
 
-    /// Activates verbose output
-    #[arg(short, long, value_parser, default_value_t = false)]
-    verbose: bool,
-
     /// Chooses salting method (only needs to be chosen for encryption)
     /// [OPTIONS = blake3, fib]
     #[arg(short, long, value_parser, default_value = "blake3")]
@@ -29,18 +27,21 @@ struct Cli {
 const HEADER_AES256_ARGON_FIB: &[u8; 32] = b"DAEDALUSAES256ARGON2FIBONAglowie";
 const HEADER_AES256_ARGON_BLAKE3: &[u8; 32] = b"DAEDALUSAES256ARGON2BLAKE3glowie";
 
-fn main() -> Result<()> {
-    // Start timer
-    let now: Instant = Instant::now();
+static POTATO: Emoji<'_, '_> = Emoji("🥔 ", "");
+static FLOPPY: Emoji<'_, '_> = Emoji("💾 ", "");
 
+fn main() -> Result<()> {
     // Gather input arguments
     let args = Cli::parse();
-    if args.salt != "blake3" || args.salt != "fib" {
-        println!("Invalid salting method!");
+    if args.salt != "blake3" && args.salt != "fib" {
+        println!("Invalid salting method!\n{} is not valid.", args.salt);
         return Ok(());
     }
     let password =
         rpassword::prompt_password("Password: ").context("Unable to get password from user!")?;
+
+    // Start timer
+    let now: Instant = Instant::now();
 
     // Read input file into memory
     let mut file = File::open(&args.file).context(format!("Could not open {}", &args.file))?;
@@ -57,18 +58,24 @@ fn main() -> Result<()> {
         let leftover_bytes = file_bytes % buffer.len() as u64;
 
         // Hash the file
+        println!("{} {}Hashing input...", style("[1/2]").bold().dim(), POTATO);
+        let pb = ProgressBar::new(file_bytes);
+        pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})").unwrap().with_key("eta", |state: &ProgressState, w: &mut dyn std::fmt::Write| write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()).progress_chars("#>-"));
         let mut hasher = blake3::Hasher::new();
-        for _ in 0..full_chunks {
+        for i in 0..full_chunks {
             file.read_exact(&mut buffer)
                 .context("Could not fill buffer for file hashing before encryption!")?;
             hasher.update(&buffer);
+            pb.set_position((i + 1) * buffer.len() as u64);
         }
         if leftover_bytes != 0 {
             file.read_to_end(&mut leftovers)
                 .context("Could not fill buffer for file hashing before encryption!")?;
             hasher.update(&leftovers);
+            pb.set_position(file_bytes)
         }
         let hash: [u8; 32] = *hasher.finalize().as_bytes();
+        pb.finish_and_clear();
 
         // Create cipher
         let mut output_key = [0u8; 32];
@@ -82,7 +89,7 @@ fn main() -> Result<()> {
                 header = *HEADER_AES256_ARGON_FIB;
                 fibonacci_salter(password.len()).as_bytes().to_vec()
             }
-            _ => bail!("Invalid salting method!"),
+            _ => bail!("Invalid salting method for encryption!"),
         };
         Argon2::default()
             .hash_password_into(password.as_bytes(), &salt, &mut output_key)
@@ -109,17 +116,21 @@ fn main() -> Result<()> {
             .context("Could not write IV to encrypted output!")?;
 
         // Encrypt the file
+        println!("{} {}Encrypting...", style("[2/2]").bold().dim(), FLOPPY);
+        let pb = ProgressBar::new(file_bytes);
+        pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})").unwrap().with_key("eta", |state: &ProgressState, w: &mut dyn std::fmt::Write| write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()).progress_chars("#>-"));
         file.rewind()
             .context(format!("Could not return to start of {}!", &args.file))?;
         let mut buffer: [u8; 1000000] = [0; 1000000];
         let mut leftovers: Vec<u8> = vec![];
-        for _ in 0..full_chunks {
+        for i in 0..full_chunks {
             file.read_exact(&mut buffer)
                 .context("Could not fill buffer for file encryption!")?;
             let encrypted = cipher.cbc_encrypt(&iv, &buffer);
             enc_file
                 .write_all(&encrypted)
                 .context(format!("Could not write to {}", output_file_name))?;
+            pb.set_position((i + 1) * buffer.len() as u64)
         }
         if leftover_bytes != 0 {
             file.read_to_end(&mut leftovers)
@@ -128,7 +139,9 @@ fn main() -> Result<()> {
             enc_file
                 .write_all(&encrypted)
                 .context(format!("Could not write to {}", output_file_name))?;
+            pb.set_position(file_bytes);
         }
+        pb.finish_and_clear();
     } else if extension(&args.file) == ".daedalus" {
         // Calculate read/write operations
         let mut buffer: [u8; 1000016] = [0; 1000016];
@@ -157,7 +170,7 @@ fn main() -> Result<()> {
         let salt = match &salt_method {
             b"FIBONA" => fibonacci_salter(password.len()).as_bytes().to_vec(),
             b"BLAKE3" => input_hash.to_vec(),
-            _ => bail!("Invalid salting method!"),
+            _ => bail!("Invalid salting method for decryption!"),
         };
         Argon2::default()
             .hash_password_into(password.as_bytes(), &salt, &mut output_key)
@@ -170,13 +183,17 @@ fn main() -> Result<()> {
             .context(format!("Could not create {}", output_file_name))?;
 
         // Decrypt the file
-        for _ in 0..full_chunks {
+        println!("{} {}Decrypting...", style("[1/2]").bold().dim(), FLOPPY);
+        let pb = ProgressBar::new(file_bytes);
+        pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})").unwrap().with_key("eta", |state: &ProgressState, w: &mut dyn std::fmt::Write| write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()).progress_chars("#>-"));
+        for i in 0..full_chunks {
             file.read_exact(&mut buffer)
                 .context("Could not fill buffer for file decryption!")?;
             let decrypted = cipher.cbc_decrypt(&iv, &buffer);
             dec_file
                 .write_all(&decrypted)
                 .context(format!("Could not write to {}", output_file_name))?;
+            pb.set_position((i + 1) * buffer.len() as u64);
         }
         if leftover_bytes != 0 {
             file.read_to_end(&mut leftovers)
@@ -185,35 +202,45 @@ fn main() -> Result<()> {
             dec_file
                 .write_all(&decrypted)
                 .context(format!("Could not write to {}", output_file_name))?;
+            pb.set_position(file_bytes);
         }
+        pb.finish_and_clear();
 
         // Calculate and compare hashes
+        println!(
+            "{} {}Hashing decryption...",
+            style("[2/2]").bold().dim(),
+            POTATO
+        );
+        let pb = ProgressBar::new(file_bytes);
+        pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})").unwrap().with_key("eta", |state: &ProgressState, w: &mut dyn std::fmt::Write| write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()).progress_chars("#>-"));
         let mut dec_file = File::open(output_file_name).unwrap();
         let mut buffer: [u8; 1000016] = [0; 1000016];
         let mut leftovers: Vec<u8> = vec![];
         let mut hasher = blake3::Hasher::new();
-        for _ in 0..full_chunks {
+        for i in 0..full_chunks {
             dec_file
                 .read_exact(&mut buffer)
                 .context("Could not fill buffer for file hashing after decryption!")?;
             hasher.update(&buffer);
+            pb.set_position((i + 1) * buffer.len() as u64);
         }
         if leftover_bytes != 0 {
             dec_file
                 .read_to_end(&mut leftovers)
                 .context("Could not fill buffer for file hashing after decryption!")?;
             hasher.update(&leftovers);
+            pb.set_position(file_bytes);
         }
         if &input_hash != hasher.finalize().as_bytes() {
             println!("Given hash of encrypted file does not match computed hash.\nCorruption or tampering may have occurred.")
         }
+        pb.finish_and_clear();
     } else {
         println!("Something went wrong! Invalid extension.\nThis should be impossible. Contact developer.");
     }
 
-    if args.verbose {
-        println!("Time Elapsed: {} ms", now.elapsed().as_millis());
-    }
+    println!("Overall Time Elapsed: {} ms", now.elapsed().as_millis());
 
     Ok(())
 }

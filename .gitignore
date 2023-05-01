@@ -5,3 +5,4 @@ Cargo.lock
 *.daedalus
 *.mkv
 .DS_Store
+*.7z

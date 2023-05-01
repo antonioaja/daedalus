@@ -51,3 +51,5 @@ Compilation tested using Cargo (1.68).
 * [rand](https://github.com/rust-random/rand)
 * [argon2](https://github.com/RustCrypto/password-hashes/tree/master/argon2)
 * [blake3](https://github.com/BLAKE3-team/BLAKE3)
+* [rpassword](https://github.com/conradkleinespel/rpassword)
+* [console](https://github.com/console-rs)

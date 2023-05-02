@@ -37,16 +37,31 @@ fn main() -> Result<()> {
         println!("Invalid salting method!\n{} is not valid.", args.salt);
         return Ok(());
     }
-    let password =
-        rpassword::prompt_password("Password: ").context("Unable to get password from user!")?;
 
-    // Start timer
-    let now: Instant = Instant::now();
+    // Define time variable
+    let now: Instant;
 
     // Read input file into memory
     let mut file = File::open(&args.file).context(format!("Could not open {}", &args.file))?;
 
     if extension(&args.file) != ".daedalus" {
+        // Request and verify password to encrypt with
+        let mut password: String;
+        loop {
+            password = rpassword::prompt_password("Password: ")
+                .context("Unable to get password from user!")?;
+
+            let reentered_password = rpassword::prompt_password("Confirm Password: ")
+                .context("Unable to get password from user!")?;
+            if password == reentered_password {
+                break;
+            }
+            println!("Passwords do not match!\nTry Again!\n\n");
+        }
+
+        // Begin timer
+        now = Instant::now();
+
         // Calculate read/write operations
         let mut buffer: Box<[u8]> = vec![0; 1000000].into_boxed_slice();
         let mut leftovers: Vec<u8> = vec![];
@@ -143,6 +158,13 @@ fn main() -> Result<()> {
         }
         pb.finish_and_clear();
     } else if extension(&args.file) == ".daedalus" {
+        // Get password
+        let password = rpassword::prompt_password("Password: ")
+            .context("Unable to get password from user!")?;
+
+        // Begin timer
+        now = Instant::now();
+
         // Calculate read/write operations
         let mut buffer: Box<[u8]> = vec![0; 1000016].into_boxed_slice();
         let mut leftovers: Vec<u8> = vec![];
@@ -237,6 +259,9 @@ fn main() -> Result<()> {
         }
         pb.finish_and_clear();
     } else {
+        // Begin timer
+        now = Instant::now();
+
         println!("Something went wrong! Invalid extension.\nThis should be impossible. Contact developer.");
     }
 

@@ -1,34 +1,20 @@
 use anyhow::*;
 use argon2::Argon2;
 use clap::Parser;
-use console::{style, Emoji};
+use console::style;
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use libaes::Cipher;
 use std::fs::File;
 use std::io::prelude::*;
 use std::{time::*, vec};
 
-#[derive(Parser, Debug)]
-#[clap(
-    author = "Antonio Aguilar",
-    version,
-    about = "A CLI program to encrypt/decrypt files"
-)]
-struct Cli {
-    /// The file to encrypt/decrypt
-    file: String,
+use crate::file_format::*;
+use crate::legacy::*;
+use crate::ui::*;
 
-    /// Chooses salting method (only needs to be chosen for encryption)
-    /// [OPTIONS = blake3, fib]
-    #[arg(short, long, value_parser, default_value = "blake3")]
-    salt: String,
-}
-
-const HEADER_AES256_ARGON_FIB: &[u8; 32] = b"DAEDALUSAES256ARGON2FIBONAglowie";
-const HEADER_AES256_ARGON_BLAKE3: &[u8; 32] = b"DAEDALUSAES256ARGON2BLAKE3glowie";
-
-static POTATO: Emoji<'_, '_> = Emoji("🥔 ", "");
-static FLOPPY: Emoji<'_, '_> = Emoji("💾 ", "");
+pub mod file_format;
+pub mod legacy;
+pub mod ui;
 
 fn main() -> Result<()> {
     // Gather input arguments
@@ -97,11 +83,11 @@ fn main() -> Result<()> {
         let header: [u8; 32];
         let salt = match args.salt.as_str() {
             "blake3" => {
-                header = *HEADER_AES256_ARGON_BLAKE3;
+                header = *crate::file_format::HEADER_AES256_ARGON_BLAKE3;
                 hash.to_vec()
             }
             "fib" => {
-                header = *HEADER_AES256_ARGON_FIB;
+                header = *crate::file_format::HEADER_AES256_ARGON_FIB;
                 fibonacci_salter(password.len()).as_bytes().to_vec()
             }
             _ => bail!("Invalid salting method for encryption!"),
@@ -268,41 +254,4 @@ fn main() -> Result<()> {
     println!("Overall Time Elapsed: {} ms", now.elapsed().as_millis());
 
     Ok(())
-}
-
-pub fn fibonacci_salter(pwd_len: usize) -> String {
-    let mut out_salt = String::new();
-
-    if pwd_len == 0 {
-        out_salt.insert(0, '0');
-    } else if pwd_len == 1 {
-        out_salt.insert(0, '1');
-    } else {
-        let mut last: u64 = 0;
-        let mut curr: u64 = 1;
-
-        out_salt.insert(0, '1');
-
-        for _ in 1..pwd_len {
-            let sum: u64 = last + curr;
-            last = curr;
-            curr = sum;
-
-            out_salt = out_salt + &curr.to_string();
-        }
-    }
-
-    while out_salt.len() < 8 {
-        out_salt += "0";
-    }
-
-    out_salt
-}
-
-pub fn extension(filename: &str) -> &str {
-    filename
-        .rfind('.')
-        .map(|idx| &filename[idx..])
-        .filter(|ext| ext.chars().skip(1).all(|c| c.is_ascii_alphanumeric()))
-        .unwrap_or("")
 }

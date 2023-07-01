@@ -6,3 +6,4 @@ Cargo.lock
 *.mkv
 .DS_Store
 *.7z
+*.zip

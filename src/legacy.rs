@@ -1,5 +1,5 @@
 /// Creates a 'salt' from the length of the password using the fibonacci sequence
-/// Better than nothing, but longer used for security reasons
+/// Better than nothing, but no longer used for security reasons
 pub fn fibonacci_salter(pwd_len: usize) -> String {
     let mut out_salt = String::new();
 

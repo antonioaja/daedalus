@@ -1,4 +1,3 @@
-use crate::fibonacci_salter;
 use anyhow::*;
 use argon2::Argon2;
 use console::style;
@@ -8,6 +7,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::vec;
 
+use crate::fibonacci_salter;
 use crate::ui::*;
 
 pub fn encrypt(file: &mut File, args: &Cli, password: String) -> Result<(), Error> {
@@ -72,8 +72,8 @@ pub fn encrypt(file: &mut File, args: &Cli, password: String) -> Result<(), Erro
     pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})").unwrap().with_key("eta", |state: &ProgressState, w: &mut dyn std::fmt::Write| write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()).progress_chars("#>-"));
     file.rewind()
         .context(format!("Could not return to start of {}!", &args.file))?;
-    let mut buffer: Box<[u8]> = vec![0; 1000000].into_boxed_slice();
-    let mut leftovers: Vec<u8> = vec![];
+    buffer = vec![0; 1000000].into_boxed_slice();
+    leftovers = vec![];
     for i in 0..full_chunks {
         file.read_exact(&mut buffer)
             .context("Could not fill buffer for file encryption!")?;

@@ -20,10 +20,10 @@ lto = true
 [dependencies]
 libaes = "0.6.4"
 anyhow = "1.0.58"
-clap = { version = "4.2.6", features = ["derive"] }
+clap = { version = "4.2.6", features = ["std", "derive"], default-features = false }
 rand = "0.8.5"
-argon2 = "0.5.0"
-blake3 = "1.3.3"
+argon2 = { features = ["alloc"], default-features = false, version = "0.5.0" }
+blake3 = { default-features = false, version = "1.3.3" }
 rpassword = "7.2.0"
-indicatif = "0.17.3"
-console = "0.15.5"
+indicatif = { default-features = false, version = "0.17.3" }
+console = { default-features = false, version = "0.15.5" }

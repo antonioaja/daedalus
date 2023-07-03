@@ -16,6 +16,7 @@ categories = ["command-line-utilities"]
 [profile.release]
 strip = true
 lto = true
+codegen-units = 1
 
 [dependencies]
 libaes = "0.6.4"
